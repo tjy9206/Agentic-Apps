@@ -1,7 +1,10 @@
 import os
 import asyncio
 import yfinance as yf
-from typing import Dict
+from typing import Optional, Dict
+
+# Import Pydantic for explicit data modeling
+from pydantic import BaseModel, Field
 
 from google.adk.agents import LlmAgent
 from google.adk.tools import FunctionTool, AgentTool, google_search
@@ -9,12 +12,29 @@ from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 from google.genai import types
 
-# --- 1. Define Specialist Tools ---------------------------------------------
-# For this example, we'll use the yfinance library, which doesn't require an
-# API key. In a production system, you would replace this with a more robust
-# financial data provider and likely pass an API key from environment variables.
+# --- 1. Define an Explicit Data Model for the Tool's Output ---
+# This resolves the parsing error by giving the ADK a clear schema for the
+# tool's return value, instead of a generic Dict.
+class FinancialData(BaseModel):
+    """Data model for the financial information of a stock."""
+    company_name: Optional[str] = Field(default=None, description="The full name of the company.")
+    sector: Optional[str] = Field(default=None, description="The sector the company operates in.")
+    industry: Optional[str] = Field(default=None, description="The specific industry of the company.")
+    market_cap: Optional[float] = Field(default=None, description="The market capitalization of the company.")
+    pe_ratio: Optional[float] = Field(default=None, description="The trailing Price-to-Earnings (P/E) ratio.")
+    forward_pe: Optional[float] = Field(default=None, description="The forward Price-to-Earnings (P/E) ratio.")
+    dividend_yield: Optional[float] = Field(default=None, description="The dividend yield as a percentage.")
+    price_to_book: Optional[float] = Field(default=None, description="The Price-to-Book (P/B) ratio.")
+    fifty_two_week_high: Optional[float] = Field(default=None, description="The 52-week high stock price.")
+    fifty_two_week_low: Optional[float] = Field(default=None, description="The 52-week low stock price.")
+    average_volume: Optional[int] = Field(default=None, description="The average daily trading volume.")
+    short_summary: Optional[str] = Field(default=None, description="A brief summary of the company's business.")
+    error: Optional[str] = Field(default=None, description="An error message if data retrieval fails.")
 
-def get_financial_data(ticker: str) -> Dict:
+
+# --- 2. Define Specialist Tools ---------------------------------------------
+# The function now returns the Pydantic model instead of a dict.
+def get_financial_data(ticker: str) -> FinancialData:
     """
     Retrieves key financial data for a given stock ticker using yfinance.
 
@@ -22,14 +42,14 @@ def get_financial_data(ticker: str) -> Dict:
         ticker: The stock ticker symbol (e.g., 'GOOGL', 'MSFT').
 
     Returns:
-        A dictionary containing key financial metrics.
+        A FinancialData object containing key financial metrics.
     """
     try:
         stock = yf.Ticker(ticker)
         info = stock.info
 
-        # Extract key metrics. yfinance keys can sometimes be missing, so we use .get()
-        financials = {
+        # Create a dictionary with the data, matching the Pydantic model fields
+        financials_dict = {
             "company_name": info.get("longName"),
             "sector": info.get("sector"),
             "industry": info.get("industry"),
@@ -43,16 +63,18 @@ def get_financial_data(ticker: str) -> Dict:
             "average_volume": info.get("averageVolume"),
             "short_summary": info.get("longBusinessSummary"),
         }
-        return financials
+        # Return an instance of the FinancialData model
+        return FinancialData(**financials_dict)
     except Exception as e:
-        return {"error": f"Could not retrieve data for {ticker}. Error: {str(e)}"}
+        # In case of an error, return a FinancialData object with the error field populated
+        return FinancialData(error=f"Could not retrieve data for {ticker}. Error: {str(e)}")
 
-# Wrap the function in ADK's FunctionTool
+# Wrap the function in ADK's FunctionTool. It will now correctly infer the schema.
 financial_data_tool = FunctionTool(func=get_financial_data)
 
 
-# --- 2. Define Specialist Agents -------------------------------------------
-# Each analyst agent has a specific role and the right tools for their job.
+# --- 3. Define Specialist Agents -------------------------------------------
+# The agent definitions remain the same. They are robust to the tool's internal implementation.
 
 fundamental_analyst = LlmAgent(
     name="FundamentalAnalyst",
@@ -89,12 +111,12 @@ economic_and_industry_analyst = LlmAgent(
 )
 
 
-# --- 3. Define the Coordinator Agent ---------------------------------------
-# The CIO agent orchestrates the specialists by using them as tools.
+# --- 4. Define the Coordinator Agent ---------------------------------------
+# The CIO agent's definition also remains unchanged.
 
 chief_investment_officer = LlmAgent(
     name="ChiefInvestmentOfficer",
-    model="gemini-2.5-pro",
+    model="gemini-2.5-pro", # Use a more powerful model for reasoning and synthesis
     description="A top-level agent that analyzes stocks for long-term potential by coordinating a team of specialist analysts.",
     instruction="""You are a Chief Investment Officer managing a team of financial analysts.
     Your goal is to form a comprehensive investment thesis on a company based on a user's request.
@@ -124,15 +146,13 @@ chief_investment_officer = LlmAgent(
 root_agent = chief_investment_officer
 
 
-# --- 4. Runner and Execution -----------------------------------------------
-# This part sets up the ADK runner to execute the agent system.
+# --- 5. Runner and Execution -----------------------------------------------
+# This part remains the same.
 
 async def main():
     """
     Initializes and runs the agentic system with a sample query.
     """
-    # You may need to set your GOOGLE_API_KEY as an environment variable
-    # if it's not already configured in your environment.
     if not os.environ.get("GOOGLE_API_KEY"):
         print("🔴 GOOGLE_API_KEY environment variable not set.")
         print("Please set it to run the agent.")
@@ -140,7 +160,6 @@ async def main():
 
     print("🟢 Initializing Stock Analysis Agentic System...")
 
-    # Initialize services for the runner
     session_service = InMemorySessionService()
     runner = Runner(
         app_name="stock_analysis_app",
@@ -148,19 +167,14 @@ async def main():
         session_service=session_service,
     )
 
-    # Create a session for the interaction
     session = await session_service.create_session(user_id="test_user")
 
-    # The user's query
-    # Try other tickers like 'MSFT', 'NVDA', 'TSLA'
-    user_query = "Should I invest in Google (GOOGL) for the long term?"
+    user_query = "Should I invest in Microsoft (MSFT) for the long term?"
     print(f"\n💬 User Query: {user_query}")
     print("-" * 30)
 
-    # Create the initial message content
     message = types.Content(role="user", parts=[types.Part(text=user_query)])
 
-    # Run the agent and stream the events
     print("🧠 ChiefInvestmentOfficer is starting the analysis...\n")
     try:
         events_async = runner.run_async(
@@ -173,7 +187,6 @@ async def main():
             if event.type == "tool_code":
                 print(f"🛠️ Calling Tool: {event.tool_code.code}")
             if event.type == "tool_output":
-                # Don't print the full tool output as it can be very long
                 print(f"✅ Tool Finished: {event.tool_output.name}")
             if event.content and event.content.parts:
                 for part in event.content.parts:
@@ -190,7 +203,6 @@ async def main():
 if __name__ == "__main__":
     # To run this code:
     # 1. Make sure you have the ADK installed.
-    # 2. Install yfinance: pip install yfinance
+    # 2. Install yfinance and pydantic: pip install yfinance pydantic
     # 3. Set your GOOGLE_API_KEY environment variable.
-    #    For example: export GOOGLE_API_KEY="YOUR_API_KEY"
     asyncio.run(main())
