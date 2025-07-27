@@ -1,21 +1,46 @@
-Agentic Apps ShowcaseWelcome to the Agentic Apps repository! This is a collection of experimental AI agent systems built using the Google Agent Development Kit (ADK). The purpose of this repository is to explore different patterns and capabilities of multi-agent systems for solving complex tasks.🤖 About the Google Agent Development Kit (ADK)The Google Agent Development Kit (ADK) is a framework designed to empower developers to build, manage, evaluate, and deploy sophisticated AI-powered agents. It provides a robust environment for creating both conversational and non-conversational agents capable of handling complex workflows by coordinating multiple specialized agents.🛠️ General Setup and InstallationAll agents in this repository are built with the ADK. To run any of them, you first need to set up your environment.1. Clone the Repositorygit clone [https://github.com/tjy9206/Agentic-Apps.git](https://github.com/tjy9206/Agentic-Apps.git)
-cd Agentic-Apps
-2. Set Up a Python Virtual EnvironmentIt's highly recommended to use a virtual environment to manage dependencies for this project.# Create the virtual environment
-python3 -m venv venv
+# Agentic Stock Analysis System
 
-# Activate the virtual environment
-# On macOS/Linux:
-source venv/bin/activate
-# On Windows:
-# venv\Scripts\activate
-3. Install the Google Agent Development Kit (ADK)Install the core ADK library using pip.pip install google-adk
-4. Set Your Google API KeyNearly all agents will require a Google API Key to use Gemini models.Get an API key from Google AI Studio.Set it as an environment variable in your terminal. This single key will be used by all agents in this repository.export GOOGLE_API_KEY="YOUR_API_KEY_HERE"
-▶️ How to Run the AgentsThe ADK comes with a powerful web-based development UI that is the primary way to interact with the agents in this repository.Project StructureThis repository is structured as a parent directory containing multiple, independent agent projects. For the adk web command to discover the agents, you must run it from the root of this repository.Agentic-Apps/      <-- Run 'adk web' from here
-├── stock_picker/
-│   ├── __init__.py
-│   └── agent.py
-└── another_agent/
-    ├── __init__.py
-    └── agent.py
-Launching the Dev UIFrom the root Agentic-Apps directory, run the following command:adk web
-This will start a local server, typically at http://localhost:8000. Open this URL in your browser.Select an Agent: Use the dropdown menu in the top-left corner to choose which agent system you want to interact with (e.g., stock_picker).Interact: Use the chat interface to send queries to the selected agent.Inspect: Use the Events and Trace tabs to inspect the agent's internal thoughts, tool calls, and execution flow.📂 Available Agentic Appsstock_picker: A multi-agent system for long-term stock analysis.(More apps to come!)
+This project is a sophisticated multi-agent system built with the Google Agent Development Kit (ADK) to perform long-term stock analysis. It uses a team of specialized AI agents, orchestrated by a Chief Investment Officer (CIO) agent, to gather and synthesize financial data, market sentiment, and economic trends into a comprehensive investment thesis.
+
+## 🚀 Features
+
+- **Multi-Agent Architecture**: Implements a robust Coordinator/Dispatcher pattern where a high-level agent manages a team of specialists.
+- **Specialized Roles**: Each agent has a distinct responsibility:
+  - **ChiefInvestmentOfficer**: The coordinator. It delegates tasks and synthesizes the final report. Powered by `gemini-2.5-pro`.
+  - **FundamentalAnalyst**: The "Quant." Analyzes financial health and valuation metrics using the `yfinance` library. Powered by `gemini-2.5-flash`.
+  - **MarketSentimentAnalyst**: The "Storyteller." Gauges public perception and news using Google Search. Powered by `gemini-2.5-flash`.
+  - **EconomicAndIndustryAnalyst**: The "Strategist." Researches the broader economic and industry landscape using Google Search. Powered by `gemini-2.5-flash`.
+- **Extensible Tooling**: Combines a custom `FunctionTool` for structured data (`yfinance`) with the powerful built-in `google_search` tool for real-time, unstructured information.
+- **Structured Output**: Uses Pydantic models to ensure reliable data handling between tools and agents.
+
+## ⚙️ How It Works
+
+1.  **User Query**: The user asks the `ChiefInvestmentOfficer` for an analysis of a specific stock (e.g., "Should I invest in Microsoft (MSFT) for the long term?").
+2.  **Delegation**: The CIO agent calls its specialist agents as tools in a specific sequence: first fundamentals, then sentiment, then economic outlook.
+3.  **Data Gathering**: The specialist agents execute their assigned tasks using their respective tools.
+4.  **Synthesis & Final Report**: The CIO receives the individual reports and synthesizes them into a single, coherent investment thesis.
+
+## 🛠️ Setup
+
+This project assumes you have already followed the setup instructions in the main repository's `README.md` (installing ADK, setting your `GOOGLE_API_KEY`, etc.).
+
+You only need to install this agent's specific dependencies:
+
+```bash
+pip install yfinance pydantic
+```
+
+## ▶️ Usage
+
+1.  Navigate to the root directory of the `Agentic-Apps` repository.
+2.  Ensure your virtual environment is active and your `GOOGLE_API_KEY` is set.
+3.  Launch the ADK Web UI:
+    ```bash
+    adk web
+    ```
+4.  Open `http://localhost:8000` in your browser.
+5.  Select the `stock_picker` agent from the dropdown menu and start your query.
+
+## ⚠️ Disclaimer
+
+This project is for educational and demonstration purposes only. The output generated by this AI agent **does not constitute financial advice**. All investment decisions should be made with the consultation of a qualified human financial professional.
